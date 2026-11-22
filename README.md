@@ -106,3 +106,14 @@ npm run dev
    - Member C: `git checkout -b feat/ui-and-figma`
 3. Commit your changes regularly from your own GitHub account.
 4. Open a **Pull Request** into `main` when ready.
+
+
+
+---
+
+## API & Role Protection Contract (Member A → Member B)
+
+To protect CRUD routes and enforce server-side role permissions, import the auth middleware from `backend/middleware/auth.js`:
+
+```javascript
+const { authenticateToken, requireRole } = require('../middleware/auth');
