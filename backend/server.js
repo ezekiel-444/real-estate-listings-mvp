@@ -20,8 +20,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes (Uncomment as Member A and Member B add route files)
-// const authRoutes = require('./routes/auth');
-// app.use('/api/auth', authRoutes);
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
