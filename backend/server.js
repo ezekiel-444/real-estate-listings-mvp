@@ -22,6 +22,10 @@ app.get('/api/health', (req, res) => {
 // Routes (Uncomment as Member A and Member B add route files)
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
+app.use('/api/cities', require('./routes/cities'));
+app.use('/api/properties', require('./routes/properties'));
+app.use('/api/favorites', require('./routes/favorites'));
+app.use('/api/inquiries', require('./routes/inquiries'));
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
