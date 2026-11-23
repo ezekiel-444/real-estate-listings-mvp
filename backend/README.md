@@ -1,4 +1,4 @@
-\# Real Estate Listings: Backend
+\ Real Estate Listings: Backend
 
 
 
@@ -6,7 +6,7 @@ Express.js REST API with a relational SQLite database (tables, primary and forei
 
 
 
-\## Stack
+\ Stack
 
 \- Node.js 22 LTS, Express
 
@@ -18,7 +18,7 @@ Express.js REST API with a relational SQLite database (tables, primary and forei
 
 
 
-\## How to run
+\ How to run
 
 
 
@@ -42,7 +42,7 @@ Never commit your real `.env` file.
 
 
 
-\## Test logins (password for all: Password123!)
+\ Test logins (password for all: Password123!)
 
 
 
@@ -58,7 +58,7 @@ Never commit your real `.env` file.
 
 
 
-\## Database (db/schema.sql)
+\ Database (db/schema.sql)
 
 \- `users` 1 to N `properties` N to 1 `cities`
 
@@ -70,7 +70,7 @@ Never commit your real `.env` file.
 
 
 
-\## API (base URL http://localhost:5000, send cookies: credentials: 'include')
+\ API (base URL http://localhost:5000, send cookies: credentials: 'include')
 
 
 
