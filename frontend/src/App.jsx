@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import EditingPage from './pages/EditingPage';
 
 // Minimal status bar for testing auth — Member C will replace with Figma Navbar
 function DevAuthBar() {
@@ -20,6 +21,7 @@ function DevAuthBar() {
         <>
           <Link to="/login">Login</Link>
           <Link to="/register">Register</Link>
+          <Link to="/editing">Editing Page</Link>
         </>
       )}
     </header>
@@ -35,6 +37,7 @@ export default function App() {
           <Route path="/" element={<main style={{ padding: '1.5rem' }}><h1>Real Estate Listings</h1></main>} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/editing" element={<EditingPage />} /> 
           <Route
             path="/agent-test"
             element={
