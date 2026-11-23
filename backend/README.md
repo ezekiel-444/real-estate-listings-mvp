@@ -1,4 +1,4 @@
-\ Real Estate Listings: Backend
+ Real Estate Listings: Backend
 
 
 
@@ -6,19 +6,19 @@ Express.js REST API with a relational SQLite database (tables, primary and forei
 
 
 
-\ Stack
+ Stack
 
-\- Node.js 22 LTS, Express
+- Node.js 22 LTS, Express
 
-\- SQLite (better-sqlite3)
+- SQLite (better-sqlite3)
 
-\- bcrypt password hashing, JWT in an httpOnly cookie
+- bcrypt password hashing, JWT in an httpOnly cookie
 
-\- Roles checked on the server: user, agent, admin
+- Roles checked on the server: user, agent, admin
 
 
 
-\ How to run
+ How to run
 
 
 
@@ -42,13 +42,12 @@ Never commit your real `.env` file.
 
 
 
-\ Test logins (password for all: Password123!)
+ Test logins (password for all: Password123!)
 
 
 
 | Role | Email | Can do |
 
-|------|-------|--------|
 
 | admin | admin@estate.com | Manage cities, edit or delete any listing |
 
@@ -58,25 +57,24 @@ Never commit your real `.env` file.
 
 
 
-\ Database (db/schema.sql)
+ Database (db/schema.sql)
 
-\- `users` 1 to N `properties` N to 1 `cities`
+- `users` 1 to N `properties` N to 1 `cities`
 
-\- `favorites`: join table between users and properties, primary key (user\_id, property\_id)
+- `favorites`: join table between users and properties, primary key (user\_id, property\_id)
 
-\- `inquiries`: links a user to a property and stores the agent's reply
+- `inquiries`: links a user to a property and stores the agent's reply
 
-\- Deleting a listing also deletes its favorites and inquiries. A city that still has listings cannot be deleted.
+- Deleting a listing also deletes its favorites and inquiries. A city that still has listings cannot be deleted.
 
 
 
-\ API (base URL http://localhost:5000, send cookies: credentials: 'include')
+ API (base URL http://localhost:5000, send cookies: credentials: 'include')
 
 
 
 | Method | Path | Access |
 
-|--------|------|--------|
 
 | POST | /api/auth/register, /login, /logout | public / any |
 
