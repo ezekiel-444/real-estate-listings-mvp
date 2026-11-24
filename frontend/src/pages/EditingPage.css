@@ -85,6 +85,16 @@
   min-width: 0;
 }
 
+.listing-location-fields {
+  display: flex;
+  gap: 12px;
+}
+
+.listing-location-fields > * {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
 .listing-label {
   display: block;
   margin: 0 0 8px;
@@ -253,10 +263,10 @@
   font-size: 14px;
 }
 
-@media (hover: none) {
-  .listing-image-remove {
-    opacity: 1;
-  }
+.listing-form-error {
+  margin: 20px 0 0;
+  color: #fecaca;
+  font-size: 14px;
 }
 
 .listing-actions {
@@ -293,6 +303,17 @@
   border: 0;
   border-radius: 120px;
   background: #dc2626;
+}
+
+.listing-button--save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (hover: none) {
+  .listing-image-remove {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 900px) {

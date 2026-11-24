@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { API_URL, SAMPLE_PROPERTIES } from "./propertyData";
+import { API_URL } from "./propertyData";
 import "./PropertyDetailPage.css";
 
 const FAVORITES_URL = "http://localhost:5000/api/favorites";
@@ -43,15 +43,12 @@ export default function PropertyDetailPage() {
     String(location.state?.property?.id) === id
       ? location.state.property
       : null;
-  const sampleProperty = SAMPLE_PROPERTIES.find(
-    (sample) => String(sample.id) === id,
-  );
-  const [property, setProperty] = useState(routeProperty || sampleProperty || null);
-  const [loading, setLoading] = useState(!routeProperty && !sampleProperty);
+  const [property, setProperty] = useState(routeProperty || null);
+  const [loading, setLoading] = useState(!routeProperty);
   const [error, setError] = useState("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(
-    Boolean((routeProperty || sampleProperty)?.is_favorite),
+    Boolean(routeProperty?.is_favorite),
   );
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -60,14 +57,6 @@ export default function PropertyDetailPage() {
     const controller = new AbortController();
 
     async function loadProperty() {
-      if (sampleProperty) {
-        setProperty(sampleProperty);
-        setIsFavorite(Boolean(sampleProperty.is_favorite));
-        setLoading(false);
-        setError("");
-        return;
-      }
-
       if (routeProperty) setProperty(routeProperty);
       setLoading(!routeProperty);
 
@@ -96,7 +85,7 @@ export default function PropertyDetailPage() {
 
     loadProperty();
     return () => controller.abort();
-  }, [id, routeProperty, sampleProperty]);
+  }, [id, routeProperty]);
 
   const images = property ? getImages(property) : [];
   const galleryImages = images.length ? images : [null];
@@ -112,11 +101,6 @@ export default function PropertyDetailPage() {
   async function toggleFavorite() {
     if (!property) return;
 
-    if (sampleProperty) {
-      setIsFavorite((saved) => !saved);
-      setSaveMessage(isFavorite ? "Removed from saved listings." : "Saved for this session.");
-      return;
-    }
     if (!user) {
       setSaveMessage("Log in with a personal account to save this listing.");
       return;
@@ -272,7 +256,7 @@ export default function PropertyDetailPage() {
                   "Address unavailable"}
               </p>
               <p className="property-detail-card__kind">
-                {property.property_type || property.building_type || "Type unavailable"}
+                {property.property_type || "Type unavailable"}
               </p>
               <div className="property-detail-card__details">
                 <span>{getRoomCount(property.rooms)}</span>
