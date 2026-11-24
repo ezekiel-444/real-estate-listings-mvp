@@ -1,11 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_URL, CITIES_URL } from "./propertyData";
 import "./EditingPage.css";
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+async function getErrorMessage(response, fallback) {
+  try {
+    const data = await response.json();
+    if (Array.isArray(data.errors)) return data.errors.join(". ");
+    return data.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export default function EditingPage() {
   const navigate = useNavigate();
+  const [cities, setCities] = useState([]);
+  const [citiesLoading, setCitiesLoading] = useState(true);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [imageError, setImageError] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const imageInputRef = useRef(null);
   const imageUrlsRef = useRef(new Set());
 
@@ -17,17 +34,64 @@ export default function EditingPage() {
     [],
   );
 
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCities() {
+      try {
+        const response = await fetch(CITIES_URL, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(
+            await getErrorMessage(response, `Loading cities failed (HTTP ${response.status}).`),
+          );
+        }
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+          throw new Error("The cities response has an unexpected format.");
+        }
+        setCities(data);
+        if (data.length === 0) {
+          setError("No cities are available. An admin must add a city before a listing can be saved.");
+        }
+      } catch (loadError) {
+        if (loadError.name !== "AbortError") {
+          setError(loadError.message || "Could not load cities.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setCitiesLoading(false);
+      }
+    }
+
+    loadCities();
+    return () => controller.abort();
+  }, []);
+
   const handleImageSelection = (event) => {
     const files = Array.from(event.currentTarget.files ?? []);
     const validFiles = files.filter((file) => file.type.startsWith("image/"));
-    setImageError(
-      validFiles.length < files.length ? "Please select image files only." : "",
+    const currentSize = imagePreviews.reduce(
+      (total, preview) => total + preview.file.size,
+      0,
     );
+    const selectedSize = validFiles.reduce((total, file) => total + file.size, 0);
+
+    if (validFiles.length < files.length) {
+      setImageError("Please select image files only.");
+    } else if (currentSize + selectedSize > MAX_IMAGE_BYTES) {
+      setImageError("Selected images must total 5 MB or less.");
+      event.currentTarget.value = "";
+      return;
+    } else {
+      setImageError("");
+    }
 
     const previews = validFiles.map((file) => {
       const url = URL.createObjectURL(file);
       imageUrlsRef.current.add(url);
-      return { name: file.name, url };
+      return { file, name: file.name, url };
     });
 
     setImagePreviews((current) => [...current, ...previews]);
@@ -40,7 +104,47 @@ export default function EditingPage() {
     setImagePreviews((current) =>
       current.filter((preview) => preview.url !== url),
     );
+    setImageError("");
   };
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+    setSaving(true);
+
+    try {
+      const formData = new FormData(event.currentTarget);
+      const payload = {
+        title: formData.get("title").trim(),
+        city_id: Number(formData.get("city_id")),
+        address: formData.get("address").trim(),
+        price: Number(formData.get("price")),
+        area_m2: Number(formData.get("area_m2")),
+        rooms: Number(formData.get("bedrooms")),
+        type: formData.get("status"),
+        description: formData.get("description").trim(),
+        image_url: null,
+      };
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error(
+          await getErrorMessage(response, `Saving listing failed (HTTP ${response.status}).`),
+        );
+      }
+
+      navigate("/listings");
+    } catch (saveError) {
+      setError(saveError.message || "Could not save this listing.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="editing-page">
@@ -66,92 +170,90 @@ export default function EditingPage() {
       </div>
 
       <main className="editing-main">
-        <section className="listing-card">
+        <form className="listing-card" onSubmit={handleSubmit}>
           <div className="listing-columns">
             <div className="listing-details">
               <div className="listing-field">
-                <label
-                  htmlFor="listing-title"
-                  className="listing-label"
-                >
-                  Title
-                </label>
+                <label htmlFor="listing-title" className="listing-label">Title</label>
                 <input
                   id="listing-title"
                   name="title"
                   type="text"
                   placeholder="Property title"
                   className={styles.input}
+                  required
                 />
               </div>
 
               <div className="listing-field">
-                <label
-                  htmlFor="listing-address"
-                  className="listing-label"
-                >
-                  Address
-                </label>
-                <input
-                  id="listing-address"
-                  name="address"
-                  type="text"
-                  placeholder="Property address"
-                  className={styles.input}
-                />
+                <p className="listing-label">Location</p>
+                <div className="listing-location-fields">
+                  <select
+                    id="listing-city"
+                    name="city_id"
+                    aria-label="City"
+                    defaultValue=""
+                    className={styles.select}
+                    required
+                    disabled={citiesLoading || cities.length === 0}
+                  >
+                    <option value="" disabled>
+                      {citiesLoading ? "Loading cities…" : "Select a city"}
+                    </option>
+                    {cities.map((city) => (
+                      <option key={city.id} value={city.id}>{city.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    id="listing-address"
+                    name="address"
+                    type="text"
+                    aria-label="Street address"
+                    placeholder="Street address"
+                    className={styles.input}
+                  />
+                </div>
               </div>
 
               <div className="listing-fields-grid">
                 <div className="listing-field listing-field--small">
-                  <label
-                    htmlFor="listing-price"
-                    className="listing-label"
-                  >
-                    Price ($)
-                  </label>
+                  <label htmlFor="listing-price" className="listing-label">Price ($)</label>
                   <input
                     id="listing-price"
                     name="price"
                     type="number"
                     min="0"
+                    step="1"
                     placeholder="Price"
                     className={styles.smallInput}
+                    required
                   />
                 </div>
 
                 <div className="listing-field listing-field--small">
-                  <label
-                    htmlFor="listing-area"
-                    className="listing-label"
-                  >
-                    Area (m²)
-                  </label>
+                  <label htmlFor="listing-area" className="listing-label">Area (m²)</label>
                   <input
                     id="listing-area"
                     name="area_m2"
                     type="number"
                     min="1"
+                    step="1"
                     placeholder="Area"
                     className={styles.smallInput}
+                    required
                   />
                 </div>
 
                 <div className="listing-field listing-field--small">
-                  <label
-                    htmlFor="listing-property-type"
-                    className="listing-label"
-                  >
-                    Property type
-                  </label>
+                  <label htmlFor="listing-property-type" className="listing-label">Property type</label>
                   <select
                     id="listing-property-type"
                     name="property_type"
                     defaultValue=""
                     className={styles.select}
+                    required
                   >
-                    <option value="" disabled>
-                      Select type
-                    </option>
+                    <option value="" disabled>Select type</option>
                     <option value="apartment">Apartment</option>
                     <option value="house">House</option>
                     <option value="condo">Condo</option>
@@ -161,42 +263,30 @@ export default function EditingPage() {
                 </div>
 
                 <div className="listing-field listing-field--small">
-                  <label
-                    htmlFor="listing-status"
-                    className="listing-label"
-                  >
-                    Status
-                  </label>
+                  <label htmlFor="listing-status" className="listing-label">Status</label>
                   <select
                     id="listing-status"
                     name="status"
                     defaultValue=""
                     className={styles.select}
+                    required
                   >
-                    <option value="" disabled>
-                      Select status
-                    </option>
+                    <option value="" disabled>Select status</option>
                     <option value="sale">For sale</option>
                     <option value="rent">For rent</option>
                   </select>
                 </div>
 
                 <div className="listing-field listing-field--small">
-                  <label
-                    htmlFor="listing-bedrooms"
-                    className="listing-label"
-                  >
-                    Bedrooms
-                  </label>
+                  <label htmlFor="listing-bedrooms" className="listing-label">Bedrooms</label>
                   <select
                     id="listing-bedrooms"
                     name="bedrooms"
                     defaultValue=""
                     className={styles.select}
+                    required
                   >
-                    <option value="" disabled>
-                      Select
-                    </option>
+                    <option value="" disabled>Select</option>
                     <option value="0">Studio</option>
                     <option value="1">1</option>
                     <option value="2">2</option>
@@ -206,21 +296,15 @@ export default function EditingPage() {
                 </div>
 
                 <div className="listing-field listing-field--small">
-                  <label
-                    htmlFor="listing-bathrooms"
-                    className="listing-label"
-                  >
-                    Bathrooms
-                  </label>
+                  <label htmlFor="listing-bathrooms" className="listing-label">Bathrooms</label>
                   <select
                     id="listing-bathrooms"
                     name="bathrooms"
                     defaultValue=""
                     className={styles.select}
+                    required
                   >
-                    <option value="" disabled>
-                      Select
-                    </option>
+                    <option value="" disabled>Select</option>
                     <option value="1">1</option>
                     <option value="1.5">1.5</option>
                     <option value="2">2</option>
@@ -233,12 +317,7 @@ export default function EditingPage() {
 
             <div className="listing-media">
               <div className="listing-field">
-                <label
-                  htmlFor="listing-description"
-                  className="listing-label"
-                >
-                  Description
-                </label>
+                <label htmlFor="listing-description" className="listing-label">Description</label>
                 <textarea
                   id="listing-description"
                   name="description"
@@ -249,9 +328,7 @@ export default function EditingPage() {
               </div>
 
               <div className="listing-field">
-                <p className="listing-label">
-                  Images
-                </p>
+                <p className="listing-label">Images</p>
                 <input
                   ref={imageInputRef}
                   type="file"
@@ -286,20 +363,18 @@ export default function EditingPage() {
                     aria-label="Add images"
                     onClick={() => imageInputRef.current?.click()}
                   >
-                    <span className="listing-image-add__plus" aria-hidden="true">
-                      +
-                    </span>
+                    <span className="listing-image-add__plus" aria-hidden="true">+</span>
                     <span>{imagePreviews.length ? "Add more" : "Add images"}</span>
                   </button>
                 </div>
                 {imageError && (
-                  <p className="listing-image-error" role="alert">
-                    {imageError}
-                  </p>
+                  <p className="listing-image-error" role="alert">{imageError}</p>
                 )}
               </div>
             </div>
           </div>
+
+          {error && <p className="listing-form-error" role="alert">{error}</p>}
 
           <div className="listing-actions">
             <button
@@ -310,13 +385,14 @@ export default function EditingPage() {
               Cancel
             </button>
             <button
-              type="button"
+              type="submit"
               className="listing-button listing-button--save"
+              disabled={saving || citiesLoading || cities.length === 0}
             >
-              Save listing
+              {saving ? "Saving…" : "Save listing"}
             </button>
           </div>
-        </section>
+        </form>
       </main>
     </div>
   );

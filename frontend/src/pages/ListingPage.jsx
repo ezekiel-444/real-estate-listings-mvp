@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import "./ListingPage.css";
 
-import { API_URL, SAMPLE_PROPERTIES } from "./propertyData";
+import { API_URL } from "./propertyData";
 const PAGE_SIZE = 50;
 const DISPLAY_PAGE_SIZE = 6;
 
@@ -57,7 +57,7 @@ function PropertyCard({ property }) {
               "Address unavailable"}
           </p>
           <p className="property-card__kind">
-            {property.property_type || property.building_type || "Type unavailable"}
+            {property.property_type || "Type unavailable"}
           </p>
           <div className="property-card__details">
             <span>{roomCount}</span>
@@ -80,7 +80,12 @@ export default function ListingPage() {
   const [minBudget, setMinBudget] = useState("");
   const [maxBudget, setMaxBudget] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [usingSampleData, setUsingSampleData] = useState(false);
+  const [error, setError] = useState("");
+
+  function updateFilter(setFilter, event) {
+    setFilter(event.target.value);
+    setCurrentPage(1);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -91,7 +96,14 @@ export default function ListingPage() {
         { signal: controller.signal },
       );
       if (!response.ok) {
-        throw new Error(`Loading listings failed (HTTP ${response.status}).`);
+        let message = `Loading listings failed (HTTP ${response.status}).`;
+        try {
+          const errorData = await response.json();
+          message = errorData.error || message;
+        } catch {
+          // Keep the HTTP status message when the server does not return JSON.
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -114,17 +126,12 @@ export default function ListingPage() {
           allProperties.push(...nextPage.items);
         }
 
-        if (allProperties.length === 0) {
-          setProperties(SAMPLE_PROPERTIES);
-          setUsingSampleData(true);
-        } else {
-          setProperties(allProperties);
-          setUsingSampleData(false);
-        }
+        setProperties(allProperties);
+        setError("");
       } catch (loadError) {
         if (loadError.name !== "AbortError") {
-          setProperties(SAMPLE_PROPERTIES);
-          setUsingSampleData(true);
+          setProperties([]);
+          setError(loadError.message || "Could not load listings.");
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -155,10 +162,6 @@ export default function ListingPage() {
       return matchesSearch && matchesType && matchesMin && matchesMax;
     });
   }, [properties, search, type, minBudget, maxBudget]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, type, minBudget, maxBudget]);
 
   const totalPages = Math.max(
     1,
@@ -204,7 +207,7 @@ export default function ListingPage() {
                 type="search"
                 placeholder="Search by address or city"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => updateFilter(setSearch, event)}
               />
             </div>
 
@@ -213,7 +216,7 @@ export default function ListingPage() {
               <select
                 id="listing-type-filter"
                 value={type}
-                onChange={(event) => setType(event.target.value)}
+                onChange={(event) => updateFilter(setType, event)}
               >
                 <option value="">All types</option>
                 <option value="sale">For sale</option>
@@ -229,7 +232,7 @@ export default function ListingPage() {
                 min="0"
                 placeholder="No minimum"
                 value={minBudget}
-                onChange={(event) => setMinBudget(event.target.value)}
+                onChange={(event) => updateFilter(setMinBudget, event)}
               />
             </div>
 
@@ -241,7 +244,7 @@ export default function ListingPage() {
                 min="0"
                 placeholder="No maximum"
                 value={maxBudget}
-                onChange={(event) => setMaxBudget(event.target.value)}
+                onChange={(event) => updateFilter(setMaxBudget, event)}
               />
             </div>
           </div>
@@ -249,27 +252,28 @@ export default function ListingPage() {
 
         <div className="listings-results-heading" aria-live="polite">
           <h2>Properties</h2>
-          {!loading && properties.length > 0 && (
+          {!loading && properties.length > 0 && !error && (
             <span>
-              {usingSampleData
-                ? `${filteredProperties.length} sample properties`
-                : `Showing ${filteredProperties.length} of ${properties.length} listings`}
+              Showing {filteredProperties.length} of {properties.length} listings
             </span>
           )}
         </div>
 
         {loading && <p className="listings-message">Loading listings…</p>}
-        {!loading && filteredProperties.length === 0 && (
-          <p className="listings-message">No listings match your filters.</p>
+        {!loading && error && (
+          <p className="listings-message" role="alert">{error}</p>
         )}
-        {!loading && filteredProperties.length > 0 && (
+        {!loading && filteredProperties.length === 0 && (
+          !error && <p className="listings-message">No listings match your filters.</p>
+        )}
+        {!loading && !error && filteredProperties.length > 0 && (
           <div className="property-list">
             {currentProperties.map((property) => (
               <PropertyCard key={property.id} property={property} />
             ))}
           </div>
         )}
-        {!loading && (
+        {!loading && !error && (
           <nav className="listing-pagination" aria-label="Listing pages">
             <button
               type="button"
