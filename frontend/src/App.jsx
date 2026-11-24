@@ -9,19 +9,28 @@ import ListingPage from "./pages/ListingPage";
 import PropertyDetailPage from "./pages/PropertyDetailPage";
 
 function DevAuthBar() {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   return (
     <header className="app-header">
       <Link className="app-header__brand" to="/listings">
         Real Estate Listings
       </Link>
       <nav className="app-header__nav" aria-label="Main navigation">
-        <Link className="app-header__button" to="/">
-          Log in
-        </Link>
-        <Link className="app-header__button" to="/register">
-          Register
-        </Link>
+        {user && (
+          <span className="app-header__user">
+            Logged in as <strong>{user.email}</strong> ({user.role})
+          </span>
+        )}
+        {!loading && !user && (
+          <>
+            <Link className="app-header__button" to="/">
+              Log in
+            </Link>
+            <Link className="app-header__button" to="/register">
+              Register
+            </Link>
+          </>
+        )}
         <Link className="app-header__button" to="/listings">
           Listings
         </Link>
@@ -30,9 +39,6 @@ function DevAuthBar() {
         </Link>
         {user && (
           <>
-            <span className="app-header__user">
-              Logged in as <strong>{user.email}</strong> ({user.role})
-            </span>
             <Link className="app-header__button" to="/agent-test">
               Test Agent Route
             </Link>

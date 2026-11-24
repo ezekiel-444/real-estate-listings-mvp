@@ -4,6 +4,7 @@ import { API_URL, CITIES_URL } from "./propertyData";
 import "./EditingPage.css";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_URL_CHARS = 60 * 1024;
 
 async function getErrorMessage(response, fallback) {
   try {
@@ -12,6 +13,49 @@ async function getErrorMessage(response, fallback) {
     return data.error || fallback;
   } catch {
     return fallback;
+  }
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Could not encode the selected image."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function compressImage(file) {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Image compression is unavailable in this browser.");
+
+    let scale = Math.min(1, 1200 / Math.max(bitmap.width, bitmap.height));
+    for (let sizeAttempt = 0; sizeAttempt < 5; sizeAttempt += 1) {
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      for (const quality of [0.75, 0.65, 0.55, 0.45]) {
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", quality),
+        );
+        if (!blob) throw new Error("Could not compress the selected image.");
+        if (blob.size * 1.4 > MAX_IMAGE_URL_CHARS) continue;
+
+        const dataUrl = await blobToDataUrl(blob);
+        if (dataUrl.length <= MAX_IMAGE_URL_CHARS) return dataUrl;
+      }
+      scale *= 0.75;
+    }
+
+    throw new Error("Could not reduce this image enough to save it.");
+  } finally {
+    bitmap.close();
   }
 }
 
@@ -70,31 +114,25 @@ export default function EditingPage() {
   }, []);
 
   const handleImageSelection = (event) => {
-    const files = Array.from(event.currentTarget.files ?? []);
-    const validFiles = files.filter((file) => file.type.startsWith("image/"));
-    const currentSize = imagePreviews.reduce(
-      (total, preview) => total + preview.file.size,
-      0,
-    );
-    const selectedSize = validFiles.reduce((total, file) => total + file.size, 0);
-
-    if (validFiles.length < files.length) {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
       setImageError("Please select image files only.");
-    } else if (currentSize + selectedSize > MAX_IMAGE_BYTES) {
-      setImageError("Selected images must total 5 MB or less.");
+      event.currentTarget.value = "";
+      return;
+    } else if (file.size > MAX_IMAGE_BYTES) {
+      setImageError("The selected image must be 5 MB or less.");
       event.currentTarget.value = "";
       return;
     } else {
       setImageError("");
     }
 
-    const previews = validFiles.map((file) => {
-      const url = URL.createObjectURL(file);
-      imageUrlsRef.current.add(url);
-      return { file, name: file.name, url };
-    });
-
-    setImagePreviews((current) => [...current, ...previews]);
+    imageUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    imageUrlsRef.current.clear();
+    const url = URL.createObjectURL(file);
+    imageUrlsRef.current.add(url);
+    setImagePreviews([{ file, name: file.name, url }]);
     event.currentTarget.value = "";
   };
 
@@ -123,7 +161,9 @@ export default function EditingPage() {
         rooms: Number(formData.get("bedrooms")),
         type: formData.get("status"),
         description: formData.get("description").trim(),
-        image_url: null,
+        image_url: imagePreviews[0]
+          ? await compressImage(imagePreviews[0].file)
+          : null,
       };
 
       const response = await fetch(API_URL, {
@@ -333,7 +373,6 @@ export default function EditingPage() {
                   ref={imageInputRef}
                   type="file"
                   accept="image/*"
-                  multiple
                   className="listing-file-input"
                   aria-label="Choose listing images"
                   onChange={handleImageSelection}
@@ -364,7 +403,7 @@ export default function EditingPage() {
                     onClick={() => imageInputRef.current?.click()}
                   >
                     <span className="listing-image-add__plus" aria-hidden="true">+</span>
-                    <span>{imagePreviews.length ? "Add more" : "Add images"}</span>
+                    <span>{imagePreviews.length ? "Change image" : "Add image"}</span>
                   </button>
                 </div>
                 {imageError && (
